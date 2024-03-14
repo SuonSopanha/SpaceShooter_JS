@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Space Shooter Game</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: black;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+      // Initialize canvas
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      // Player ship
+      let player = {
+        x: canvas.width / 2,
+        y: canvas.height - 50,
+        width: 50,
+        height: 50,
+        speed: 5,
+        level: 1,
+        levelIncreased: false,
+      };
+
+      // Projectile
+      const projectiles = [];
+      const enemyProjectiles = [];
+      const projectileSpeed = 5;
+      const projectileSize = 5;
+
+      // Enemy ships
+      const enemies = [];
+      let enemySpeed = 1;
+      const enemySize = 50;
+      const spawnRate = 1000; // milliseconds
+      const enemyFireRate = 2000; // milliseconds
+
+      // Score
+      let score = 0;
+
+      // Game loop
+      function update() {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw score and level
+        ctx.fillStyle = "white";
+        ctx.font = "24px Arial";
+        ctx.fillText("Score: " + score, 10, 30);
+        ctx.fillText("Level: " + player.level, 10, 60);
+
+        // Draw player ship
+        ctx.fillStyle = "blue";
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        // Move projectiles
+        projectiles.forEach((projectile, index) => {
+          ctx.fillStyle = "red";
+          ctx.fillRect(
+            projectile.x,
+            projectile.y,
+            projectileSize,
+            projectileSize
+          );
+
+          // Move projectiles based on their direction
+          if (projectile.direction === "up") {
+            projectile.y -= projectileSpeed;
+          } else if (projectile.direction === "down") {
+            projectile.y += projectileSpeed;
+          } else if (projectile.direction === "left") {
+            projectile.x -= projectileSpeed;
+          } else if (projectile.direction === "right") {
+            projectile.x += projectileSpeed;
+          }
+
+          // Remove projectiles that are out of bounds
+          if (
+            projectile.x < 0 ||
+            projectile.x > canvas.width ||
+            projectile.y < 0 ||
+            projectile.y > canvas.height
+          ) {
+            projectiles.splice(index, 1);
+          }
+        });
+
+        // Move enemy projectiles
+        enemyProjectiles.forEach((projectile, index) => {
+          ctx.fillStyle = "yellow";
+          ctx.fillRect(
+            projectile.x,
+            projectile.y,
+            projectileSize,
+            projectileSize
+          );
+
+          // Move enemy projectiles downward
+          projectile.y += projectileSpeed;
+
+          // Remove enemy projectiles that are out of bounds
+          if (projectile.y >= canvas.height) {
+            enemyProjectiles.splice(index, 1);
+          }
+        });
+
+        // Spawn enemies
+        if (Math.random() < 0.01) {
+          const direction = Math.random() < 0.5 ? -1 : 1; // Random direction
+          enemies.push({
+            x: direction === -1 ? canvas.width + enemySize : -enemySize,
+            y: Math.random() * (canvas.height - enemySize),
+            width: enemySize,
+            height: enemySize,
+            direction: direction,
+          });
+        }
+
+        // Move enemies
+        enemies.forEach((enemy, index) => {
+          enemy.x += enemySpeed * enemy.direction;
+          ctx.fillStyle = "green";
+          ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+
+          // Fire bullets at player
+          if (Math.random() < 0.01) {
+            enemyProjectiles.push({
+              x: enemy.x + enemy.width / 2 - projectileSize / 2,
+              y: enemy.y + enemy.height,
+            });
+          }
+
+          // Check for collision with player
+          if (
+            player.x < enemy.x + enemy.width &&
+            player.x + player.width > enemy.x &&
+            player.y < enemy.y + enemy.height &&
+            player.y + player.height > enemy.y
+          ) {
+            alert("Game Over! Your final score is: " + score);
+            document.location.reload();
+          }
+
+          // Check for collision with player projectiles
+          projectiles.forEach((projectile, projIndex) => {
+            if (
+              projectile.x < enemy.x + enemy.width &&
+              projectile.x + projectileSize > enemy.x &&
+              projectile.y < enemy.y + enemy.height &&
+              projectile.y + projectileSize > enemy.y
+            ) {
+              // Remove projectile
+              projectiles.splice(projIndex, 1);
+              // Remove enemy
+              enemies.splice(index, 1);
+              // Increase score
+              score += 10;
+            }
+          });
+        });
+
+        // Check for collision with enemy projectiles
+        enemyProjectiles.forEach((projectile, projIndex) => {
+          if (
+            projectile.x < player.x + player.width &&
+            projectile.x + projectileSize > player.x &&
+            projectile.y < player.y + player.height &&
+            projectile.y + projectileSize > player.y
+          ) {
+            // Remove projectile
+            enemyProjectiles.splice(projIndex, 1);
+            // Game over
+            alert("Game Over! Your final score is: " + score);
+            document.location.reload();
+          }
+        });
+
+        // Increase player speed and enemy speed when score reaches the next milestone
+        if (score > 0 && score % 50 === 0 && !player.levelIncreased) {
+          player.level++;
+          player.speed += 0.5; // Increase player speed
+          enemySpeed += 0.2; // Increase enemy speed
+          player.levelIncreased = true; // Set flag to true
+        } else if (score % 50 !== 0) {
+          player.levelIncreased = false; // Reset flag when score is not a multiple of 100
+        }
+
+        // Player special ability at level 5
+        if (player.level >= 5) {
+          window.addEventListener("keydown", fireSpecialProjectile);
+        }
+
+        requestAnimationFrame(update);
+      }
+
+      update();
+
+      // Player controls
+      window.addEventListener("keydown", (e) => {
+        switch (e.key) {
+          case "a":
+            projectiles.push({
+              x: player.x,
+              y: player.y + player.height / 2 - projectileSize / 2,
+              direction: "left",
+            });
+            break;
+          case "d":
+            projectiles.push({
+              x: player.x + player.width,
+              y: player.y + player.height / 2 - projectileSize / 2,
+              direction: "right",
+            });
+            break;
+          case "w":
+            projectiles.push({
+              x: player.x + player.width / 2 - projectileSize / 2,
+              y: player.y,
+              direction: "up",
+            });
+            break;
+          case "s":
+            projectiles.push({
+              x: player.x + player.width / 2 - projectileSize / 2,
+              y: player.y + player.height,
+              direction: "down",
+            });
+            break;
+
+          case "ArrowUp":
+            if (player.y > 0) player.y -= player.speed;
+            break;
+          case "ArrowLeft":
+            if (player.x > 0) player.x -= player.speed;
+            break;
+          case "ArrowDown":
+            if (player.y < canvas.height - player.height)
+              player.y += player.speed;
+            break;
+          case "ArrowRight":
+            if (player.x < canvas.width - player.width)
+              player.x += player.speed;
+            break;
+        }
+      });
+
+      // Special fire ability
+      function fireSpecialProjectile(e) {
+        if (e.key === "x") {
+            projectiles.push({
+              x: player.x,
+              y: player.y + player.height / 2 - projectileSize / 2,
+              direction: "left",
+            });
+            projectiles.push({
+              x: player.x + player.width,
+              y: player.y + player.height / 2 - projectileSize / 2,
+              direction: "right",
+            });
+            projectiles.push({
+              x: player.x + player.width / 2 - projectileSize / 2,
+              y: player.y,
+              direction: "up",
+            });
+            projectiles.push({
+              x: player.x + player.width / 2 - projectileSize / 2,
+              y: player.y + player.height,
+              direction: "down",
+            });
+        }
+      }
+    </script>
+  </body>
+</html>
